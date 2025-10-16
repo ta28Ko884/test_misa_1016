@@ -17,9 +17,6 @@ h1 {
 }
 
 canvas {
-    background-color: #111;
-    border: 2px solid #fff;
-    background-image: url('https://raw.githubusercontent.com/user-attachments/assets/e3635a1c-1496-4391-861f-e6a43b18c8b3'); /* Forest background */
-    background-size: cover;
-    background-position: center;
+    background-color: #808080; /* Gray */
+    border: 2px solid orange;
 }

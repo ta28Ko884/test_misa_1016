@@ -4,8 +4,13 @@ const ctx = canvas.getContext('2d');
 // Game state
 let score = 0;
 let gameOver = false;
+let gameStarted = false;
 
-// Player (Date Masamune)
+// High Scores
+const HIGH_SCORES = 'highScores';
+const MAX_HIGH_SCORES = 5;
+
+// Player
 const player = {
     x: canvas.width / 2 - 25,
     y: canvas.height - 60,
@@ -27,10 +32,12 @@ const enemyWidth = 40;
 const enemyHeight = 40;
 const enemyRows = 4;
 const enemyCols = 8;
-const enemySpeed = 1;
+const initialEnemySpeed = 1;
+let enemySpeed = initialEnemySpeed;
 let enemyDirection = 1; // 1 for right, -1 for left
 
 function createEnemies() {
+    enemies.length = 0; // Clear existing enemies
     for (let i = 0; i < enemyRows; i++) {
         for (let j = 0; j < enemyCols; j++) {
             enemies.push({
@@ -82,23 +89,46 @@ function drawEnemies() {
 function drawScore() {
     ctx.fillStyle = 'white';
     ctx.font = '20px Arial';
-    ctx.fillText(`Score: ${score}`, 20, 30);
+    ctx.textAlign = 'right';
+    ctx.fillText(`Score: ${score}`, canvas.width - 20, 30);
+}
+
+function drawStartScreen() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'white';
+    ctx.font = '40px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('スズメちゃんインベーダー', canvas.width / 2, canvas.height / 2 - 40);
+    ctx.font = '20px Arial';
+    ctx.fillText('Press Space to Start', canvas.width / 2, canvas.height / 2 + 20);
 }
 
 function drawGameOver() {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'white';
     ctx.font = '50px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+    ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 150);
+
+    ctx.font = '30px Arial';
+    ctx.fillText(`Your Score: ${score}`, canvas.width / 2, canvas.height / 2 - 100);
+
+    const highScores = JSON.parse(localStorage.getItem(HIGH_SCORES)) || [];
+    ctx.font = '24px Arial';
+    ctx.fillText('High Scores', canvas.width / 2, canvas.height / 2 - 50);
+    ctx.font = '18px Arial';
+    highScores.forEach((s, i) => {
+        ctx.fillText(`${i + 1}. ${s}`, canvas.width / 2, canvas.height / 2 - 20 + i * 25);
+    });
+
     ctx.font = '20px Arial';
-    ctx.fillText('Press Enter to Restart', canvas.width / 2, canvas.height / 2 + 20);
+    ctx.fillText('Press Enter to Restart', canvas.width / 2, canvas.height / 2 + 120);
 }
 
 function updatePlayer() {
     player.x += player.dx;
-    // Wall detection
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
 }
@@ -106,9 +136,7 @@ function updatePlayer() {
 function updateProjectiles() {
     projectiles.forEach((p, index) => {
         p.y -= projectileSpeed;
-        if (p.y < 0) {
-            projectiles.splice(index, 1);
-        }
+        if (p.y < 0) projectiles.splice(index, 1);
     });
 }
 
@@ -116,50 +144,43 @@ function updateEnemies() {
     let moveDown = false;
     enemies.forEach(enemy => {
         enemy.x += enemySpeed * enemyDirection;
-        if (enemy.x + enemy.width > canvas.width || enemy.x < 0) {
-            moveDown = true;
-        }
+        if (enemy.x + enemy.width > canvas.width || enemy.x < 0) moveDown = true;
     });
 
     if (moveDown) {
         enemyDirection *= -1;
-        enemies.forEach(enemy => {
-            enemy.y += enemyHeight / 2;
-        });
+        enemies.forEach(enemy => enemy.y += enemyHeight / 2);
     }
 }
 
+function setGameOver() {
+    gameOver = true;
+    checkHighScore(score);
+}
+
+function checkHighScore(newScore) {
+    const highScores = JSON.parse(localStorage.getItem(HIGH_SCORES)) || [];
+    highScores.push(newScore);
+    highScores.sort((a, b) => b - a);
+    highScores.splice(MAX_HIGH_SCORES);
+    localStorage.setItem(HIGH_SCORES, JSON.stringify(highScores));
+}
+
 function collisionDetection() {
-    // Projectile vs Enemy
     projectiles.forEach((p, pIndex) => {
         enemies.forEach((enemy, eIndex) => {
-            if (
-                p.x < enemy.x + enemy.width &&
-                p.x + projectileWidth > enemy.x &&
-                p.y < enemy.y + enemy.height &&
-                p.y + projectileHeight > enemy.y
-            ) {
-                // Collision detected
+            if (p.x < enemy.x + enemy.width && p.x + projectileWidth > enemy.x && p.y < enemy.y + enemy.height && p.y + projectileHeight > enemy.y) {
                 projectiles.splice(pIndex, 1);
                 enemies.splice(eIndex, 1);
                 score += 10;
+                enemySpeed += 0.02; // Increase enemy speed
             }
         });
     });
 
-    // Enemy vs Player
     enemies.forEach(enemy => {
-        if (
-            player.x < enemy.x + enemy.width &&
-            player.x + player.width > enemy.x &&
-            player.y < enemy.y + enemy.height &&
-            player.y + player.height > enemy.y
-        ) {
-            gameOver = true;
-        }
-        // Enemy reaches bottom
-        if (enemy.y + enemy.height > canvas.height) {
-            gameOver = true;
+        if ((player.x < enemy.x + enemy.width && player.x + player.width > enemy.x && player.y < enemy.y + enemy.height && player.y + player.height > enemy.y) || (enemy.y + enemy.height > canvas.height)) {
+            setGameOver();
         }
     });
 }
@@ -168,70 +189,59 @@ function clear() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-function gameLoop() {
-    if (gameOver) {
+function update() {
+    clear();
+    if (!gameStarted) {
+        drawStartScreen();
+    } else if (gameOver) {
         drawGameOver();
+    } else {
+        updatePlayer();
+        updateProjectiles();
+        updateEnemies();
+        collisionDetection();
+        drawPlayer();
+        drawProjectiles();
+        drawEnemies();
+        drawScore();
+        if (enemies.length === 0) createEnemies();
+    }
+    requestAnimationFrame(update);
+}
+
+function handleKeyDown(e) {
+    if (!gameStarted && e.code === 'Space') {
+        gameStarted = true;
+        createEnemies();
         return;
     }
 
-    clear();
-    updatePlayer();
-    updateProjectiles();
-    updateEnemies();
-    collisionDetection();
+    if (gameStarted && !gameOver) {
+        if (e.key === 'ArrowRight' || e.key === 'Right') player.dx = player.speed;
+        else if (e.key === 'ArrowLeft' || e.key === 'Left') player.dx = -player.speed;
+        else if (e.code === 'Space' && projectiles.length === 0) { // Check if projectile array is empty
+            projectiles.push({ x: player.x + player.width / 2 - projectileWidth / 2, y: player.y });
+        }
+    }
 
-    drawPlayer();
-    drawProjectiles();
-    drawEnemies();
-    drawScore();
-
-    if (enemies.length === 0) {
-        // You win or next level
+    if (gameOver && e.key === 'Enter') {
+        gameStarted = true;
+        gameOver = false;
+        score = 0;
+        enemySpeed = initialEnemySpeed; // Reset enemy speed
+        player.x = canvas.width / 2 - 25;
+        projectiles.length = 0;
         createEnemies();
     }
-
-    requestAnimationFrame(gameLoop);
 }
 
-function movePlayer(e) {
-    if (e.key === 'ArrowRight' || e.key === 'Right') {
-        player.dx = player.speed;
-    } else if (e.key === 'ArrowLeft' || e.key === 'Left') {
-        player.dx = -player.speed;
-    }
-}
-
-function stopPlayer(e) {
+function handleKeyUp(e) {
     if (e.key === 'ArrowRight' || e.key === 'Right' || e.key === 'ArrowLeft' || e.key === 'Left') {
         player.dx = 0;
     }
 }
 
-function shoot(e) {
-    if (e.code === 'Space' && !gameOver) {
-        projectiles.push({
-            x: player.x + player.width / 2 - projectileWidth / 2,
-            y: player.y
-        });
-    }
-}
+document.addEventListener('keydown', handleKeyDown);
+document.addEventListener('keyup', handleKeyUp);
 
-function restartGame(e) {
-    if (e.key === 'Enter' && gameOver) {
-        score = 0;
-        gameOver = false;
-        player.x = canvas.width / 2 - 25;
-        projectiles.length = 0;
-        enemies.length = 0;
-        createEnemies();
-        gameLoop();
-    }
-}
-
-document.addEventListener('keydown', movePlayer);
-document.addEventListener('keyup', stopPlayer);
-document.addEventListener('keydown', shoot);
-document.addEventListener('keydown', restartGame);
-
-createEnemies();
-gameLoop();
+update();
