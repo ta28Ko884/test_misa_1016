@@ -17,6 +17,6 @@ h1 {
 }
 
 canvas {
-    background-color: #808080; /* Gray */
+    background-color: #000; /* Black */
     border: 2px solid orange;
 }
